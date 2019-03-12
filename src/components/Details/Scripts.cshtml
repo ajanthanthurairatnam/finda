@@ -1,0 +1,64 @@
+﻿@model Electrac.Plugin.MembershipCore.Models.MemberWizardSettings
+@using Electrac.Plugin.MembershipCore.Helpers
+@Html.Partial("Details/ScriptsWizard")
+@*@Html.ScriptBundle(Url, "MembershipACT", "cc.actmember")*@
+<script type="text/javascript">
+
+    $(function () {
+
+        var methods = @(Html.PaymentMethodsJson());
+        methods[0].Selected = true;
+
+        var gridEl = $("#MatchResult");
+        var tabs = $(".k-tabstrip");
+        var rollMatchPanel = $('.el-rollmatch-binding');
+        var matchResultsEl = gridEl.parent();
+        var paymentDetailsPanel = $('#paymentDetailsPanel');
+        var memberDetailsPanel = $('#memberDetailsPanel');
+        var detailsRoot = $('.el-member-details-binding');
+        var renewal = false;
+
+        vm = new CampaignCentralACT.ACTNewMemberWizardViewModel({
+            targets: {
+                grid: gridEl,
+                tabs: tabs,
+                rollMatchPanel: rollMatchPanel,
+                matchResults: matchResultsEl,
+                memberDetailsPanel: memberDetailsPanel,
+                paymentDetailsPanel: paymentDetailsPanel,
+                detailsRoot: detailsRoot
+            },
+            settings: {
+                rollQuery: function() {
+                    return {
+                        FirstName: $("#FirstName").val(),
+                        LastName: $("#LastName").val(),
+                        Postcode: $("#Postcode").val()
+                    };
+                },
+                methods: methods,
+                renewal: @(Model.Renewal ? "true" : "false"),
+                isSupporter: @(Model.Supporter ? "true" : "false"),
+                groupAdd: groupAdd,
+                type: null @* Old code referenced a var named 'type'. Don't see this anywhere! *@
+            }
+        });
+
+        var checkApproved;
+        $("#files").kendoUpload({
+            async: {
+                saveUrl: '@Url.Action("FormUpload_FileSave", "API_Member")',
+                removeUrl: '@Url.Action("FormUpload_FileRemove", "API_Member")',
+                autoUpload: false
+            },
+            upload: onFormUpload
+        });
+
+        @Html.Partial("Details/PluginWizardScripts")
+
+    });
+
+    function onFormUpload(e) {
+        e.data = { id: !$.isEmptyObject(vm.detailsModel) ? vm.detailsModel.ElectorID() : 0 };
+    }
+</script>

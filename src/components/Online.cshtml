@@ -1,0 +1,1421 @@
+﻿@* WARNING THIS IS A COPY/PASTE OVERRIDE OF THE FULL FILE IN MEMBERSHIPCORE
+    I HATE DOING THIS BUT DONT HAVE TIME TO PROPERLY MAKE THIS NICE
+    THIS SHOULD REALLY BE REACT BUT I DONT HAVE TIME TO DO THAT EITHER *@
+@using Electrac.Plugin.MembershipCore.App_Code
+@using ML.Membership.OnlinePaymentModel
+@using Electrac.Model.Membership
+@using Electrac.Plugin.MembershipCore.Models.Components.MemberDetails
+@using Electrac.Core.Utilities
+@using Newtonsoft.Json
+
+
+@{
+
+    Html.PageTitle("Online Payment").UseBootstrap();
+    var componentId = Guid.NewGuid().ToString().Replace("-", "");
+
+
+
+
+
+    var bootstrap = new MemberDetailsBootstrap()
+    {
+        ComponentId = componentId,
+        Mode = MemberDetailsMode.New,
+        ComponentClassName = "member-details",
+        Theme = MemberDetailsTheme.AlpAct
+    };
+
+
+    List<OnlineApplicationType> onlineAppTypes = new List<OnlineApplicationType>();
+
+        onlineAppTypes.Add(new OnlineApplicationType() { Count = 0, Value = OnlinePaymentAction.New.ToString(), DisplayText = "New Member" } );
+        onlineAppTypes.Add(new OnlineApplicationType() { Count = 0, Value = OnlinePaymentAction.BranchTransfer.ToString(), DisplayText = "Branch Transfers" });
+        onlineAppTypes.Add(new OnlineApplicationType() { Count = 0, Value = OnlinePaymentAction.PartyUnitJoins.ToString(), DisplayText = "Party Unit Joins" });
+        onlineAppTypes.Add(new OnlineApplicationType() { Count = 0, Value = OnlinePaymentAction.CardUpdate.ToString(), DisplayText = "Update Member Cards" });
+        onlineAppTypes.Add(new OnlineApplicationType() { Count = 0, Value = OnlinePaymentAction.Donation.ToString(), DisplayText = "Donations" });
+
+
+    var onlineapplicationtypes = onlineAppTypes.ToArray();
+
+    var elId = Guid.NewGuid().ToString().Replace("-", "");
+
+    }
+
+
+    @section Styles{
+
+    <style>
+
+        .member-details-box input {
+            width: 100%;
+        }
+
+            .member-details-box input[type="checkbox"], .member-details-box input[type="radio"] {
+                width: inherit;
+            }
+
+        .member-details-box {
+            margin-bottom: 50px;
+        }
+    </style>
+
+}
+
+@helper FormItemforCreditCard(string label, string field)
+{
+<div class="form-group" data-bind="visible: Method() == 'Credit Card'">
+    <label class="control-label col-sm-3">@label</label>
+    <div class="col-sm-7 col-md-6">
+        <input data-bind="value: @field" class="k-textbox" name="@field" type="text">
+    </div>
+</div>
+}
+
+
+<div class="container">
+    <div class="ra-first-section">
+
+        <div class="container-fluid" id="People-Comms-Box">
+            <div id="@elId" class="react-mount-point"></div>
+        </div>
+ 
+    </div>
+    <br />
+    <div class="ra-section clearfix">
+        <strong>Online Members</strong>
+        @(Html.Kendo().Grid<OnlineMemberModel>()
+                                                                                                      .Name("OnlineMember")
+                                                                                                      .Columns(col =>
+                                                                                                      {
+                                                                                                  //col.Bound(m => m.ElectorID).ClientTemplate(Html.ElectorPopupTemplate(entity: false, kendo: true, nameTemplate: "<#= Name #>").ToString()).Title("Name");
+                                                                                                  col.Bound(m => m.FirstName);
+                                                                                                          col.Bound(m => m.LastName);
+                                                                                                          col.Bound(m => m.TransactionDate).Format("{0:d}");
+                                                                                                          col.Bound(m => m.Address1);
+                                                                                                          col.Bound(m => m.Address2);
+                                                                                                          col.Bound(m => m.Suburb);
+                                                                                                          col.Bound(m => m.Postcode);
+                                                                                                          col.Bound(m => m.State);
+                                                                                                          col.Bound(m => m.Id).Title("")
+                                                                                                            .ClientTemplate("<a href=\"\\#\" class=\"k-button edit-notes\">Notes</a>");
+
+                                                                                                      })
+                                                                                                      .Pageable(p => p.Messages(m => m.Empty("No new members found.")))
+                                                                                                      .Sortable()
+                                                                                                      .Selectable()
+                                                                                                      .Filterable()
+                                                                                                      .Events(e => e.Change("onOnlineMemberSelect"))
+                                                                                                      //.BindTo(ViewBag.OnlineMembers as IEnumerable<OnlineMemberModel>)
+                                                                                                      .DataSource(ds => ds.Ajax().Read("OnlineMembers_Read", "Member").Model(m => m.Id(a => a.Id)))
+                                                                                                      /*.DataSource(ds => ds.Ajax().Read(r => r.Action("OnlineMember_Read", "Membership")))*/)
+    </div>
+    <section class="well ra-section clearfix el-rollmatch-binding">
+        <div class="form-horizontal form-widgets">
+
+            @Form.Item("MemberNumber", "MemberNumber")
+            @Form.Item("LastName", "LastName")
+            @Form.Item("FirstName", "FirstName")
+            @Form.Item("Dob", "Dob")
+            @Form.Item("Postcode", "Postcode")
+
+            <div class="float-right">
+                <button class="k-button" data-bind="click: RollMatch">Search</button>
+            </div>
+            @Html.Hidden("ManualSearch", "")
+        </div>
+    </section>
+
+    <div class="ra-section clearfix el-member-online-matches el-hidden">
+        <strong>Matches</strong>
+        @Html.Partial("PersonMatchResult")
+    </div>
+    <div class="clear el-member-online-notfoundonroll el-hidden" data-bind="visible: $root.FormDetails().Type && $root.FormDetails().Type() != 'Renewal'">
+        <button class="k-button" data-bind="visible: NotFoundOnRoll, click: NotOnRoll">Not Found on Roll</button>
+    </div>
+    <br />
+
+
+    <div class="well clearfix ra-section el-onlinemember-details el-hidden" data-bind="visible: Visible">
+        <div class="row">
+            <h3 class="ra-well-title">Profile</h3>
+
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+
+                @Form.Item("Title", "Title")
+                @Form.Item("Last Name", "LastName")
+                @Form.Item("First Name", "FirstName")
+                @Form.Item("Other Names", "OtherNames")
+                @Form.Item("Known As", "Knownas")
+                @Form.Item("Occupation", "Occupation")
+                @Form.Item("Gender", "Gender", maxLength: 1)
+                @Form.Item("Dob", "Dob", date: true)
+                <div class="form-group" data-bind="visible: $root.ProfileBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.ProfileBack">Back</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4" data-bind="visible: $root.ProfileUpdated">
+                <!-- ko if: !$.isEmptyObject($root.ElectoralRoll()) -->
+                <!-- ko with: $root.ElectoralRoll -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Electoral Roll</strong></div>
+                </div>
+
+                @Form.DisplayItem("Title", "Title", noLabel: true)
+                @Form.DisplayItem("Last Name", "LastName", noLabel: true)
+                @Form.DisplayItem("First Name", "FirstName", noLabel: true)
+                @Form.DisplayItem("Other Names", "OtherNames", noLabel: true)
+                @Form.DisplayItem("Known As", "Knownas", noLabel: true)
+                @Form.DisplayItem("Occupation", "Occupation", noLabel: true)
+                @Form.DisplayItem("Gender", "Gender", noLabel: true)
+                @Form.DisplayItem("Dob", "Dob()", date: true, noLabel: true)
+
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.FormDetails()) -->
+                <!-- ko with: $root.FormDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Online Form</strong></div>
+                </div>
+                @Form.DisplayItem("Title", "Title")
+                @Form.DisplayItem("Last Name", "LastName")
+                @Form.DisplayItem("First Name", "FirstName")
+                @Form.DisplayItem("Other Names", "OtherNames")
+                @Form.DisplayItem("Known As", "Knownas")
+                @Form.DisplayItem("Occupation", "Occupation")
+                @Form.DisplayItem("Gender", "Gender")
+                @Form.DisplayItem("Dob", "Dob()", date: true)
+                <div class="form-group" data-bind="visible: $root.ProfileUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.ProfileUpdate">Update</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+
+
+
+
+        <div class="row">
+            <h3 class="ra-well-title clear">Address</h3>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+
+                @Form.Item("Habitat", "Habitat")
+                @Form.Item("Unit", "Unit")
+                @Form.Item("Number", "Number")
+                @Form.Item("Street", "Street")
+                @Form.Item("Suburb", "SubTown")
+                @Form.Item("Postcode", "Postcode")
+                @Form.Item("State", "State")
+                <div class="form-group" data-bind="visible: $root.AddressBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.AddressBack">Back</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4" data-bind="visible: $root.AddressUpdated">
+                <!-- ko if: !$.isEmptyObject($root.ElectoralRoll()) -->
+                <!-- ko with: $root.ElectoralRoll -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Electoral Roll</strong></div>
+                </div>
+
+                @Form.DisplayItem("Habitat", "Habitat", noLabel: true)
+                @Form.DisplayItem("Unit", "Unit", noLabel: true)
+                @Form.DisplayItem("Number", "Number", noLabel: true)
+                @Form.DisplayItem("Street", "Street", noLabel: true)
+                @Form.DisplayItem("Suburb", "SubTown", noLabel: true)
+                @Form.DisplayItem("Postcode", "Postcode", noLabel: true)
+                @Form.DisplayItem("State", "State", noLabel: true)
+
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.FormDetails()) -->
+                <!-- ko with: $root.FormDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Online Form</strong></div>
+                </div>
+                @Form.DisplayItem("Address1", "Address1")
+                @Form.DisplayItem("Address2", "Address2")
+                @Form.DisplayItem("Suburb", "Suburb")
+                @Form.DisplayItem("Postcode", "Postcode")
+                @Form.DisplayItem("State", "State")
+                <div class="form-group" data-bind="visible: $root.AddressUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.AddressUpdate">Update</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+        <div class="row">
+            <h3 class="ra-well-title clear">Postal Address</h3>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+                @Form.Item("Address1", "Postal1")
+                @Form.Item("Address2", "Postal2")
+                @Form.Item("Postcode", "PostalCode")
+                @Form.Item("State", "State")
+                <div class="form-group" data-bind="visible: $root.PostalAddressBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.PostalAddressBack">Back</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4" data-bind="visible: $root.PostalAddressUpdated">
+                <!-- ko if: !$.isEmptyObject($root.ElectoralRoll()) -->
+                <!-- ko with: $root.ElectoralRoll -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Electoral Roll</strong></div>
+                </div>
+
+                @Form.DisplayItem("Address1", "Postal1", noLabel: true)
+                @Form.DisplayItem("Address2", "Postal2", noLabel: true)
+                @Form.DisplayItem("Postcode", "Postcode", noLabel: true)
+                @Form.DisplayItem("State", "State", noLabel: true)
+
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.FormDetails()) -->
+                <!-- ko with: $root.FormDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Online Form</strong></div>
+                </div>
+                @Form.DisplayItem("Address1", "Postal1")
+                @Form.DisplayItem("Address2", "Postal2")
+                @Form.DisplayItem("Postcode", "PostalCode")
+                @Form.DisplayItem("State", "State")
+                <div class="form-group" data-bind="visible: $root.PostalAddressUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.PostalAddressUpdate">Update</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+        <div class="row">
+            <h3 class="ra-well-title clear">Contact Details</h3>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+                @Form.Item("Phone", "Phone")
+                <div class="form-group" data-bind="visible: $root.PhoneUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.PhoneUpdated">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.PhoneBack">Back</button>
+                    </div>
+                </div>
+                @Form.Item("Phone(B)", "Phone2")
+                <div class="form-group" data-bind="visible: $root.Phone2UpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.Phone2Updated">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.Phone2Back">Back</button>
+                    </div>
+                </div>
+
+                @Form.Item("Mobile", "Mobile")
+                <div class="form-group" data-bind="visible: $root.MobileUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.MobileUpdated">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.MobileBack">Back</button>
+                    </div>
+                </div>
+                @Form.Item("Email", "Email")
+                <div class="form-group" data-bind="visible: $root.EmailUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.EmailUpdated">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.EmailBack">Back</button>
+                    </div>
+                </div>
+                @*@Form.Item("Fax", "Fax")
+                    <div class="form-group" data-bind="visible: $root.FaxUpdateVisible">
+                        <label class="control-label col-sm-3"></label>
+                        <div class="col-sm-7 col-md-6">
+                        </div>
+                    </div>
+                    <div class="form-group" data-bind="visible: $root.FaxUpdated">
+                        <label class="control-label col-sm-3"></label>
+                        <div class="col-sm-7 col-md-6">
+                            <button class="k-button" data-bind="click: $root.FaxBack">Back</button>
+                        </div>
+                    </div>*@
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4" data-bind="visible: $root.ContactUpdated">
+                <!-- ko if: !$.isEmptyObject($root.ElectoralRoll()) -->
+                <!-- ko with: $root.ElectoralRoll -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Electoral Roll</strong></div>
+                </div>
+
+                @Form.DisplayItem("Phone", "Phone", visible: "$root.PhoneUpdated", noLabel: true)
+                <div class="form-group" data-bind="visible: $root.PhoneUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+
+                    </div>
+                </div>
+                @Form.DisplayItem("", "Phone2", visible: "$root.Phone2Updated", noLabel: true)
+                <div class="form-group" data-bind="visible: $root.Phone2UpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+
+                    </div>
+                </div>
+
+                @Form.DisplayItem("Mobile", "Mobile", visible: "$root.MobileUpdated", noLabel: true)
+                <div class="form-group" data-bind="visible: $root.MobileUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+
+                    </div>
+                </div>
+                @Form.DisplayItem("Email", "Email", visible: "$root.EmailUpdated", noLabel: true)
+                @*@Form.DisplayItem("Fax", "Fax", visible: "$root.FaxUpdated", noLabel: true)
+                    <div class="form-group" data-bind="visible: $root.FaxUpdateVisible">
+                        <label class="control-label col-sm-3"></label>
+                        <div class="col-sm-7 col-md-6">
+
+                        </div>
+                    </div>*@
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.FormDetails()) -->
+                <!-- ko with: $root.FormDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Online Form</strong></div>
+                </div>
+                @Form.DisplayItem("Phone", "PhoneHome")
+                <div class="form-group" data-bind="visible: $root.PhoneUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.PhoneUpdate">Update</button>
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.PhoneBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                @Form.DisplayItem("Phone(B)", "PhoneBusiness")
+                <div class="form-group" data-bind="visible: $root.Phone2UpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.Phone2Update">Update</button>
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.Phone2BackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                @Form.DisplayItem("Mobile", "Mobile")
+                <div class="form-group" data-bind="visible: $root.MobileUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.MobileUpdate">Update</button>
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.MobileBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                @Form.DisplayItem("Email", "Email")
+                <div class="form-group" data-bind="visible: $root.EmailUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.EmailUpdate">Update</button>
+                    </div>
+                </div>
+                <div class="form-group" data-bind="visible: $root.EmailBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                    </div>
+                </div>
+                @* @Form.DisplayItem("Fax", "Fax")
+                    <div class="form-group" data-bind="visible: $root.FaxUpdateVisible">
+                        <label class="control-label col-sm-3"></label>
+                        <div class="col-sm-7 col-md-6">
+                            <button class="k-button" data-bind="click: $root.FaxUpdate">Update</button>
+                        </div>
+                    </div>
+                    <div class="form-group" data-bind="visible: $root.FaxBackVisible">
+                        <label class="control-label col-sm-3"></label>
+                        <div class="col-sm-7 col-md-6">
+                        </div>
+                    </div>*@
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+        <div class="row">
+            <h3 class="ra-well-title clear">Membership</h3>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+                @Form.KendoDropDownItem("Member Type", "$root.MemberTypes()", "MemberType", "Select Type...", true)
+
+                @*<div data-bind="visible: $root.FormDetails().Type() == 'Renewal'">
+                        This is the effective date of the renewal transaction.
+                    </div>*@
+                @Form.KendoDateItem("Join Date", "JoinedOn", visible: "$root.FormDetails().Type() == 'New'")
+                @Form.KendoDateItem("Transaction Date", "EffectiveDate", visible: "$root.FormDetails().Type() != 'New'")
+
+                @Form.KendoComboBoxItem("Current Branch", "$root.MemberBranches", "CurrentBranchID", "Select Branch...", true)
+                @Form.KendoMultiSelectItem("Union", "$root.MemberUnionID", "$root.MemberUnions()", "Select Union...")
+
+                @Form.CheckboxItem("Concession Card", "Concession")
+                @Form.KendoDropDownItem("Payment Choice", "$root.PaymentChoices", "PaymentChoice", "Select payment choice")
+
+                <div class="form-group" data-bind="visible: $root.MembershipBackVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.MembershipBack">Back</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4" data-bind="visible: $root.MembershipUpdated">
+                <!-- ko if: !$.isEmptyObject($root.ElectoralRoll()) -->
+                <!-- ko with: $root.ElectoralRoll -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Electoral Roll</strong></div>
+                </div>
+                @Form.DisplayItem("", "MemberType", noLabel: true)
+                @Form.DisplayItem("", "JoinedOn", noLabel: true, visible: "$root.FormDetails().Type() == 'New'")
+                @Form.DisplayItem("", "EffectiveDate", noLabel: true, visible: "$root.FormDetails().Type() != 'New'")
+                @Form.DisplayItem("", "$root.ExistingOldBranch()", noLabel: true)
+                @Form.DisplayItem("", "$root.ExistingOldUnion()", noLabel: true)
+                @Form.DisplayItem("", "Concession", noLabel: true, checkBox: true)
+
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <div class="form-horizontal form-widgets col-md-4">
+                <!-- ko if: !$.isEmptyObject($root.FormDetails()) -->
+                <!-- ko with: $root.FormDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Online Form</strong></div>
+                </div>
+                @Form.DisplayItem("Member Type", "MemberType")
+                @Form.DisplayItem("Join Date", "JoinedOn()", true, visible: "$root.FormDetails().Type() == 'New'")
+                @Form.DisplayItem("Transaction Date", "EffectiveDate()", true, visible: "$root.FormDetails().Type() != 'New'")
+                @Form.DisplayItem("Current Branch", "CurrentBranch")
+                @Form.DisplayItem("Union", "Union")
+                @Form.DisplayItem("Concession Card", "Concession", checkBox: true)
+                @Form.DisplayItem("Payment Choice", "PaymentChoice")
+                <div class="form-group" data-bind="visible: $root.MembershipUpdateVisible">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6">
+                        <button class="k-button" data-bind="click: $root.MembershipUpdate">Update</button>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <h3 class="ra-well-title clear">Electorates</h3>
+            <div class="form-horizontal form-widgets col-md-6">
+                <!-- ko if: !$.isEmptyObject($root.MemberDetails()) -->
+                <!-- ko with: $root.MemberDetails -->
+                <div class="form-group">
+                    <label class="control-label col-sm-3"></label>
+                    <div class="col-sm-7 col-md-6"><strong>Member Record</strong></div>
+                </div>
+                @Form.KendoComboBoxItem("Federal Electorate", "$root.FedElectorates()", "ElecFed", "Select Electorate...")
+                @Form.KendoComboBoxItem("State Electorate", "$root.StateElectorates()", "ElecState", "Select Electorate...")
+                @Form.KendoComboBoxItem("Municipality", "$root.LocalElectorates()", "ElecLocal", "Select Electorate...")
+                <!-- /ko -->
+                <!-- /ko -->
+
+
+                <button class="k-button" data-bind="click:CalculateElectorates">Calculate</button>
+            </div>
+            <div class="form-horizontal form-widgets col-md-6">
+
+            </div>
+            <div class="clear">
+                <div class="float-right">
+                    <!-- ko if: $root.FormLink() != "" -->
+                    <a class="big-line" data-bind="attr:{href: $root.FormLink}">Member Joining Form</a><span>&nbsp;&nbsp;</span>
+                    <!-- /ko -->
+                    <button class="k-button" data-bind="enable: $root.ProcessVisible() && !$root.ProcessSuccess(), click: $root.Process">Process</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="well el-online-status el-hidden" data-bind="visible: Visible">
+        <img class="float-left" src="../../Content/images/green_tick.jpg" alt="Success" />
+
+        <div class="fontDarkblue">The online form has been submitted successfully.</div>
+
+        <div class="big-line" data-bind="visible: MemberNumberVisible">
+            Member number is <span class="big-text" data-bind="text: MemberNumber"></span>
+        </div>
+    </div>
+
+</div>
+
+
+<div class="member-details-box">
+    <div id="@componentId">
+
+        <div class="ml-spinner">
+            <div class="spinner">
+                <div class="bounce1"></div>
+                <div class="bounce2"></div>
+                <div class="bounce3"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="container">
+    <div class="well clearfix ra-section el-onlinemember-payment el-hidden" data-bind="visible: Visible">
+        <h3 class="ra-well-title">Payment Details</h3>
+
+        <div class="form-horizontal form-widgets">
+            <!-- ko if: !$.isEmptyObject($root.Data()) -->
+            <!-- ko with: $root.Data -->
+            <!-- ko if: $root.Data().Method() == "CreditCard" -->
+            @Form.DisplayItem("Name on Card", "NameOnCard")
+            @Form.DisplayItem("Card Number", "CardNumber")
+            @Form.DisplayItem("Expiry Date", "ExpiryDate")
+            @*@Form.DisplayItem("CVC", "CVC")*@
+            <!-- /ko -->
+            <!-- ko if: $root.Data().Method() == "DirectDebit" -->
+            @Form.DisplayItem("Account Name", "NameOnCard")
+            @Form.DisplayItem("BSB", "BSB")
+            @Form.DisplayItem("Account Number", "AccountNumber")
+            <!-- /ko -->
+            @Form.DisplayItem("Total Amount", "TotalDisplay")
+            <div class="form-group">
+                <label class="control-label col-sm-3">Items</label>
+                <div class="col-sm-7 col-md-6">
+                    <table>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount</th>
+                        </tr>
+                        <tbody data-bind="foreach: Lines">
+                            <tr>
+                                <td data-bind="text: Item"></td>
+                                <td data-bind="text: AmountDisplay"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="form-group" data-bind="visible: $root.RejectVisible">
+                <label class="control-label col-sm-3"></label>
+                <div class="col-sm-7 col-md-6">
+                    <button class="k-button" data-bind="visible: !$root.Rejected(),click: $root.Reject">Reject</button>
+                    <button class="k-button" data-bind="visible: $root.Rejected(),click: $root.Cancel">Cancel</button>
+                </div>
+            </div>
+            <div class="form-group" data-bind="visible: $root.Rejected">
+                <label class="control-label col-sm-3"></label>
+                <div class="col-sm-7 col-md-6">
+                    <span class="fontDarkblue">Please create or save the member details below to finish this process.</span>
+                </div>
+            </div>
+            <!-- /ko -->
+            <!-- /ko -->
+        </div>
+    </div>
+</div>
+
+@section Scripts
+    {
+    <script>
+
+        var vm = null;
+
+        var paymentChoices = JSON.parse('@(Html.EnumToJson<FeePeriod>())');
+        function matchCriteria() {
+            var grid = $('#OnlineMember').data('kendoGrid');
+            var dataItem = grid.dataItem(grid.select());
+            return {
+                FirstName: onlineSearchModel && onlineSearchModel.Search() ? onlineSearchModel.FirstName() : (!dataItem ? "" : dataItem.FirstName),
+                LastName: onlineSearchModel && onlineSearchModel.Search() ? onlineSearchModel.LastName() : (!dataItem ? "" : dataItem.LastName),
+                Postcode: onlineSearchModel && onlineSearchModel.Search() ? onlineSearchModel.Postcode() : (!dataItem ? "" : dataItem.Postcode),
+                Dob: onlineSearchModel && onlineSearchModel.Search() ? onlineSearchModel.Dob() : (!dataItem ? "" : kendo.toString(dataItem.Dob, 'd')),
+                MemberNumber: onlineSearchModel && onlineSearchModel.Search() ? onlineSearchModel.MemberNumber() : (!dataItem ? "" : dataItem.MemberNumber),
+                MemberSearch: $('#OnlineApplicationType').val() != "New"
+            };
+        }
+
+        function onMatchResultRowSelect(e) {
+            // onlineMemberDetailsModel.Visible(true);
+            onlineMemberDetailsModel.Visible(false);
+
+            var dataItem = e.sender.dataItem(e.sender.select());
+            onlineStatus.Visible(false);
+
+            if (!dataItem) return false;
+
+            rebootElectorId(dataItem.ElectorID);
+
+            // $.get('/API_MEMBER/GetDetails/?electorId=' + dataItem.ElectorID, function (data) {
+            //     ko.mapping.fromJS({ MemberDetails: data }, {}, onlineMemberDetailsModel);
+            //     onlineMemberDetailsModel.MemberUnionID(data.UnionID);
+            //     ko.mapping.fromJS({ ElectoralRoll: data }, {}, onlineMemberDetailsModel);
+            //     if (!onlineMemberDetailsModel.ElectoralRoll().CurrentBranch)
+            //         onlineMemberDetailsModel.ElectoralRoll().CurrentBranch = ko.observable();
+            //     if (!onlineMemberDetailsModel.ElectoralRoll().Union)
+            //         onlineMemberDetailsModel.ElectoralRoll().Union = ko.observable();
+
+            //     onlineMemberDetailsModel.MembershipUpdate();
+            //     onlineMemberDetailsModel.EmailUpdate(true);
+            // });
+        }
+
+        var dataItem;
+
+        function onOnlineMemberSelect(e) {
+            $('.el-member-online-matches').hide().delay(100).slideDown();
+            var grid = $('#MatchResult').data('kendoGrid');
+            grid.dataSource.read();
+            dataItem = e.sender.dataItem(e.sender.select());
+
+            if(vm) {
+                vm.options.bootstrap.Id = dataItem.Id;
+            }
+
+
+            electrac.ResetKnockoutModel(onlineSearchModel);
+            onlineSearchModel.LastName(dataItem.LastName);
+            onlineSearchModel.FirstName(dataItem.FirstName);
+            onlineSearchModel.MemberNumber(dataItem.MemberNumber);
+            onlineSearchModel.Postcode(dataItem.Postcode);
+            onlineSearchModel.Dob(kendo.toString(dataItem.Dob, 'd'));
+
+            electrac.ResetKnockoutModel(onlineMemberDetailsModel);
+            electrac.ResetKnockoutModel(onlinePaymentModel);
+            electrac.ResetKnockoutModel(onlineStatus);
+            ko.mapping.fromJS({ FormDetails: dataItem }, {}, onlineMemberDetailsModel);
+            ko.mapping.fromJS({ Data: dataItem.Payment.toJSON() }, {}, onlinePaymentModel);
+            onlinePaymentModel.Data().Id(dataItem.Id);
+            onlineMemberDetailsModel.Visible(false);
+            // clear previous roll details
+            onlineMemberDetailsModel.ElectoralRoll({});
+            onlineMemberDetailsModel.MemberDetails({});
+            onlineMemberDetailsModel.NotFoundOnRoll(true);
+            onlinePaymentModel.Visible(true);
+
+            $('.el-hidden').removeClass('el-hidden');
+        }
+
+        function OnlineStatus() {
+            var self = this;
+
+            self.Visible = ko.observable(false).extend({reset: true});
+            self.MemberNumber = ko.observable(0).extend({ reset: true });
+            self.MemberNumberVisible = ko.observable(false).extend({ reset: true });
+        }
+
+
+
+        function asyncComputed(evaluator) {
+            var result = ko.observable();
+
+            ko.computed(async function () {
+                // Get the $.Deferred value, and then set up a callback so that when it's done,
+                // the output is transferred onto our "result" observable
+                var res = await evaluator();
+
+                result(res);
+            });
+
+            return result;
+        }
+
+
+        var OnlinePaymentModel = function () {
+            var self = this;
+            self.Visible = ko.observable(false).extend({ reset: true });
+            self.Data = ko.observable({}).extend({ reset: true });
+            self.Id = ko.observable(0);
+
+            self.RejectVisible = ko.computed(function () {
+                return !$.isEmptyObject(self.Data()) && self.Data().Method() == "CreditCard";
+            }, self);
+
+            self.Rejected = ko.computed(function() {
+                return !$.isEmptyObject(self.Data()) && self.Data().Rejected();
+            }, self);
+            self.Reject = function () {
+
+                self.Data().Rejected(true);
+            };
+
+            self.Cancel = function () {
+                self.Data().Rejected(false);
+            };
+        };
+        var OnlineMemberDetailsModel = function (paymentChoices) {
+            var self = this;
+            self.Visible = ko.observable(false).extend({ reset: true });
+            self.MemberDetails = ko.observable({}).extend({ reset: true });
+            self.ElectoralRoll = ko.observable({}).extend({ reset: true });
+            self.FormDetails = ko.observable({}).extend({ reset: true });
+            self.IsRenewal = ko.computed(function() {
+
+                if ($.isEmptyObject(self.FormDetails())) return false;
+
+                return self.FormDetails().Type() == "Renewal";
+
+            }, self);
+            self.NotFoundOnRoll = ko.observable(false);
+            self.NotOnRoll = function () {
+                // self.Visible(true);
+                self.Visible(false);
+
+                $('#MatchResult').data('kendoGrid').clearSelection();
+
+                self.ElectoralRoll({});
+
+                rebootAsExternalSource(dataItem.Id);
+
+
+                // $.ajax({
+                //     url: '/API_MEMBER/getnotonroll/',
+                //     data: { FirstName: dataItem.FirstName, LastName: dataItem.LastName, Postcode: dataItem.Postcode },
+                //     type: 'POST'
+                // }).done(function (data) {
+                //     ko.mapping.fromJS({ MemberDetails: data }, {}, self);
+                //     self.MemberUnionID(data.UnionID);
+                //     // auto apply each
+                //     self.UpdateAll();
+                // }).fail(function () {
+                //     $.alert("Server error. Please try again or contact support.");
+                // });
+
+            };
+
+            self.PaymentChoices = ko.observable(paymentChoices);
+
+            self.UpdateAll = function() {
+                self.ProfileUpdate();
+                self.AddressUpdate();
+                self.PostalAddressUpdate();
+                self.PhoneUpdate();
+                self.MobileUpdate();
+                self.Phone2Update();
+                self.EmailUpdate();
+                self.MembershipUpdate();
+            };
+
+            self.ProfileUpdateVisible = ko.observable(true).extend({ reset: true });
+            self.ProfileUpdated = ko.observable(false).extend({ reset: true });
+            self.ProfileUpdate = function () {
+                self.MemberDetails().Title(self.FormDetails().Title());
+                self.MemberDetails().LastName(self.FormDetails().LastName());
+                self.MemberDetails().FirstName(self.FormDetails().FirstName());
+                self.MemberDetails().OtherNames(self.FormDetails().OtherNames());
+                self.MemberDetails().Knownas(self.FormDetails().Knownas());
+                self.MemberDetails().Occupation(self.FormDetails().Occupation());
+                self.MemberDetails().Gender(self.FormDetails().Gender());
+                self.MemberDetails().Dob(self.FormDetails().Dob());
+                self.ProfileUpdateVisible(false);
+                self.ProfileUpdated(true);
+                self.ProfileBackVisible(true);
+            };
+            self.ProfileBackVisible = ko.observable(false).extend({ reset: true });
+            self.ProfileBack = function () {
+                self.MemberDetails().Title(self.ElectoralRoll().Title());
+                self.MemberDetails().LastName(self.ElectoralRoll().LastName());
+                self.MemberDetails().FirstName(self.ElectoralRoll().FirstName());
+                self.MemberDetails().OtherNames(self.ElectoralRoll().OtherNames());
+                self.MemberDetails().Knownas(self.ElectoralRoll().Knownas());
+                self.MemberDetails().Occupation(self.ElectoralRoll().Occupation());
+                self.MemberDetails().Gender(self.ElectoralRoll().Gender());
+                self.MemberDetails().Dob(self.ElectoralRoll().Dob());
+                self.ProfileUpdateVisible(true);
+                self.ProfileUpdated(false);
+                self.ProfileBackVisible(false);
+            };
+
+            self.AddressUpdateVisible = ko.observable(true).extend({ reset: true });
+            self.AddressUpdated = ko.observable(false).extend({ reset: true });
+            self.AddressUpdate = function () {
+
+
+                var a1 = self.FormDetails().Address1();
+                var h = '';
+                if (!!self.FormDetails().Address2()) {
+                    a1 = self.FormDetails().Address2();
+                    h = self.FormDetails().Address1();
+                }
+                self.MemberDetails().Habitat(h);
+                self.MemberDetails().Unit('');
+                self.MemberDetails().Number('');
+                self.MemberDetails().Street(a1);
+                self.MemberDetails().SubTown(self.FormDetails().Suburb());
+                self.MemberDetails().Postcode(self.FormDetails().Postcode());
+                self.MemberDetails().State(self.FormDetails().State());
+                self.AddressUpdateVisible(false);
+                self.AddressUpdated(true);
+                self.AddressBackVisible(true);
+            };
+            self.AddressBackVisible = ko.observable(false).extend({ reset: true });
+            self.AddressBack = function () {
+                self.MemberDetails().Habitat(self.ElectoralRoll().Habitat());
+                self.MemberDetails().Unit(self.ElectoralRoll().Unit());
+                self.MemberDetails().Number(self.ElectoralRoll().Number());
+                self.MemberDetails().Street(self.ElectoralRoll().Street());
+                self.MemberDetails().SubTown(self.ElectoralRoll().Suburb());
+                self.MemberDetails().Postcode(self.ElectoralRoll().Postcode());
+                self.MemberDetails().State(self.ElectoralRoll().State());
+                self.AddressUpdateVisible(true);
+                self.AddressUpdated(false);
+                self.AddressBackVisible(false);
+            };
+
+            self.PostalAddressUpdateVisible = ko.observable(true).extend({ reset: true });
+            self.PostalAddressUpdated = ko.observable(false).extend({ reset: true });
+            self.PostalAddressUpdate = function () {
+                self.MemberDetails().Postal1(self.FormDetails().Postal1());
+                self.MemberDetails().Postal2(self.FormDetails().Postal2());
+                self.MemberDetails().Postcode(self.FormDetails().Postcode());
+                self.MemberDetails().State(self.FormDetails().State());
+                self.PostalAddressUpdateVisible(false);
+                self.PostalAddressUpdated(true);
+                self.PostalAddressBackVisible(true);
+            };
+            self.PostalAddressBackVisible = ko.observable(false).extend({ reset: true });
+            self.PostalAddressBack = function () {
+                self.MemberDetails().Postal1(self.ElectoralRoll().Postal1());
+                self.MemberDetails().Postal2(self.ElectoralRoll().Postal2());
+                self.MemberDetails().Postcode(self.ElectoralRoll().Postcode());
+                self.MemberDetails().State(self.ElectoralRoll().State());
+                self.PostalAddressUpdateVisible(true);
+                self.PostalAddressUpdated(false);
+                self.PostalAddressBackVisible(false);
+            };
+
+            self.PhoneUpdated = ko.observable(false).extend({ reset: true });
+            self.PhoneUpdateVisible = ko.computed(function () {
+                return !self.PhoneUpdated() && !$.isEmptyObject(self.FormDetails()) && !!self.FormDetails().PhoneHome() && (!$.isEmptyObject(self.MemberDetails()) && self.FormDetails().PhoneHome() != self.MemberDetails().Phone());
+            }, self);
+            self.PhoneUpdate = function () {
+                self.MemberDetails().Phone(self.FormDetails().PhoneHome());
+                self.PhoneUpdated(true);
+            };
+            self.PhoneBack = function () {
+                self.MemberDetails().Phone(self.ElectoralRoll().Phone());
+                self.PhoneUpdated(false);
+            };
+
+            self.Phone2Updated = ko.observable(false).extend({ reset: true });
+            self.Phone2UpdateVisible = ko.computed(function () {
+                return !self.Phone2Updated() && !$.isEmptyObject(self.FormDetails()) && !!self.FormDetails().PhoneBusiness() && (!$.isEmptyObject(self.MemberDetails()) && self.FormDetails().PhoneBusiness() != self.MemberDetails().Phone2());
+            }, self);
+            self.Phone2Update = function () {
+                self.MemberDetails().Phone2(self.FormDetails().PhoneBusiness());
+                self.Phone2Updated(true);
+            };
+            self.Phone2Back = function () {
+                self.MemberDetails().Phone2(self.ElectoralRoll().Phone2());
+                self.Phone2Updated(false);
+            };
+
+            self.MobileUpdated = ko.observable(false).extend({ reset: true });
+            self.MobileUpdateVisible = ko.computed(function () {
+                return !self.MobileUpdated() && !$.isEmptyObject(self.FormDetails()) && !!self.FormDetails().Mobile() && (!$.isEmptyObject(self.MemberDetails()) && self.FormDetails().Mobile() != self.MemberDetails().Mobile());
+            }, self);
+            self.MobileUpdate = function () {
+                self.MemberDetails().Mobile(self.FormDetails().Mobile());
+                self.MobileUpdated(true);
+            };
+            self.MobileBack = function () {
+                self.MemberDetails().Mobile(self.ElectoralRoll().Mobile());
+                self.MobileUpdated(false);
+            };
+
+            self.FaxUpdated = ko.observable(false).extend({ reset: true });
+            self.FaxUpdateVisible = ko.computed(function () {
+                return !self.FaxUpdated() && !$.isEmptyObject(self.FormDetails()) && !!self.FormDetails().Fax() && (!$.isEmptyObject(self.MemberDetails()) && self.FormDetails().Fax() != self.MemberDetails().Fax());
+            }, self);
+            self.FaxUpdate = function () {
+                self.MemberDetails().Fax(self.FormDetails().Fax());
+                self.FaxUpdated(true);
+            };
+            self.FaxBack = function () {
+                self.MemberDetails().Fax(self.ElectoralRoll().Fax());
+                self.FaxUpdated(false);
+            };
+
+            self.EmailUpdated = ko.observable(false).extend({ reset: true });
+            self.EmailUpdateVisible = ko.computed(function () {
+                return !self.EmailUpdated() && !$.isEmptyObject(self.FormDetails()) && !!self.FormDetails().Email() && (!$.isEmptyObject(self.MemberDetails()) && self.FormDetails().Email() != self.MemberDetails().Email());
+            }, self);
+            self.EmailUpdate = function (auto) {
+                if (auto === true && !!self.MemberDetails().Email()) return;
+
+                self.MemberDetails().Email(self.FormDetails().Email());
+                self.EmailUpdated(true);
+            };
+            self.EmailBack = function () {
+                self.MemberDetails().Email(self.ElectoralRoll().Email());
+                self.EmailUpdated(false);
+            };
+
+            self.MemberUnionID = ko.observableArray([]).extend({ reset: true });
+            self.MembershipUpdateVisible = ko.observable(true).extend({ reset: true });
+            self.MembershipUpdated = ko.observable(false).extend({ reset: true });
+            self.MembershipUpdate = function () {
+                if (self.FormDetails().JoinedOn())
+                    self.MemberDetails().JoinedOn(self.FormDetails().JoinedOn());
+
+                if (self.FormDetails().EffectiveDate())
+                    self.MemberDetails().EffectiveDate(self.FormDetails().EffectiveDate());
+
+                if (!self.MemberDetails().UnionID()) {
+                    self.MemberDetails().UnionID = ko.observableArray([]);
+                }
+                if (self.FormDetails().Union() && self.FormDetails().Union().length) {
+                    var a = Enumerable.from(self.MemberUnions()).firstOrDefault(function (x) { return x.Text().indexOf(self.FormDetails().Union()) > -1; });
+                    if (a) {
+                        //self.ExistingOldUnion($('input[name=UnionID]').data('kendoMultiSelect').value());
+                        //hack to get the multiselect working, cannot use push
+                        var tmp = [];
+                        if (!$.isEmptyObject(self.ElectoralRoll())) {
+                            var uid = self.ElectoralRoll().UnionID();
+                            if (uid) tmp = uid;
+                        }
+                        tmp.push(a.Value());
+                        self.MemberUnionID(tmp);
+                        //self.MemberDetails().UnionID.push(a.Value());
+                    }
+                }
+
+                if (self.FormDetails().CurrentBranch()) {
+                    var a = Enumerable.from(self.MemberBranches()).firstOrDefault(function (x) { return x.Text() === self.FormDetails().CurrentBranch(); });
+                    if (a) {
+                        self.ExistingOldBranch($('input[name=CurrentBranchID]').data('kendoComboBox').text());
+                        self.MemberDetails().CurrentBranchID(a.Value());
+                    }
+                }
+
+                if (self.FormDetails().MemberType()) {
+                    var a = Enumerable.from(self.MemberTypes()).firstOrDefault(function (x) { return x.Value() === self.FormDetails().MemberType(); });
+                    if (a) {
+                        //self.ExistingOldBranch($('input[name=MemberType]').data('kendoComboBox').text());
+                        self.MemberDetails().MemberType(a.Value());
+                    }
+                }
+
+                if (self.FormDetails().Concession())
+                    self.MemberDetails().Concession(self.FormDetails().Concession());
+
+                if (self.FormDetails().PaymentChoice()) {
+                    var a = Enumerable.from(self.PaymentChoices()).firstOrDefault(function (x) { return x.Text === self.FormDetails().PaymentChoice(); });
+                    if (a) {
+                        self.MemberDetails().PaymentChoice(a.Value);
+                    }
+                }
+
+                self.MembershipUpdateVisible(false);
+                self.MembershipUpdated(true);
+                self.MembershipBackVisible(true);
+            };
+            self.MembershipBackVisible = ko.observable(false).extend({ reset: true });
+            self.MembershipBack = function () {
+                self.MemberDetails().JoinedOn(self.ElectoralRoll().JoinedOn());
+                //if (!self.MemberDetails().UnionID()) {
+                //    self.MemberDetails().UnionID = ko.observableArray([]);
+                //}
+                self.MemberUnionID(self.ElectoralRoll().UnionID());
+
+                self.MemberDetails().CurrentBranchID(self.ElectoralRoll().CurrentBranchID());
+
+                self.MembershipUpdateVisible(true);
+                self.MembershipUpdated(false);
+                self.MembershipBackVisible(false);
+            };
+
+            self.MemberTypes = ko.observableArray();
+            self.MemberBranchesFull = ko.observable();
+            self.MemberBranches = asyncComputed(function() {
+                if (!this.MemberDetails() || $.isEmptyObject(this.MemberDetails())) return [];
+
+
+                var suburb = self.MemberDetails().SubTown();
+
+                return $.ajax({ url: '/ActMember/BranchForSuburb', data: { suburb: suburb } })
+                    .then((id) => {
+                        if (id) {
+                            return ko.utils.arrayFilter(self.MemberBranchesFull(), function(item, index) {
+                                return item.Value() == id;
+                            });
+                        }
+                        console.log('Suburb not found in lookup');
+                        return this.MemberBranchesFull();
+                    })
+
+            }.bind(self));
+
+            self.MemberUnions = ko.observableArray();
+            self.FedElectorates = ko.observableArray();
+            self.StateElectorates = ko.observableArray();
+            self.LocalElectorates = ko.observableArray();
+
+            self.ExistingOldBranch = ko.observable().extend({ reset: true });
+            self.ExistingOldUnion = ko.observable().extend({ reset: true });
+
+            self.ProcessVisible = ko.observable(true).extend({ reset: true });
+            self.ProcessSuccess = ko.observable(false).extend({ reset: true });
+            self.Process = function () {
+                if ($('.el-onlinemember-details').kendoValidator().data('kendoValidator').validate()) {
+                    //hack to get union working
+                    self.ProcessVisible(false);
+                    self.MemberDetails().UnionID(self.MemberUnionID());
+                    $.ajax({
+                        url: '/member/OnlinePaymentProcess',
+                        data: ko.toJSON({
+                            memberDetails: self.MemberDetails(),
+                            paymentModel: onlinePaymentModel.Data(),
+                            type: $('#OnlineApplicationType').val(),
+                            addressUpdated: self.AddressUpdated(),
+                            reference: self.FormDetails().Reference()
+                        }),
+                        type: 'POST',
+                        contentType: 'application/json'
+                    }).done(function (result) {
+
+                        self.ProcessVisible(true);
+                        self.ProcessSuccess(true);
+                        grid.dataSource.read();
+
+                        resetOnlinePayment();
+
+                        onlineStatus.Visible(true);
+                        var hasNumber = result && result.MemberNumber > 0;
+                        if (hasNumber) onlineStatus.MemberNumber(result.MemberNumber);
+                        onlineStatus.MemberNumberVisible(hasNumber);
+                    }).fail(function () {
+                        self.ProcessVisible(true);
+                        $.alert("Server error. Please try again or contact support.");
+                    });
+                }
+            };
+
+            self.FormLink = ko.computed(function () {
+                if (!$.isEmptyObject(self.FormDetails()) && self.FormDetails().Reference()) return 'http://walabor.org.au/join?task=pdf&pass=__mcgowanforprem2013__&ref=' + self.FormDetails().Reference();
+                return '';
+            });
+
+            self.ContactUpdated = ko.computed(function () {
+                return self.Phone2Updated() || self.PhoneUpdated() || self.MobileUpdated() || self.FaxUpdated() || self.EmailUpdated();
+            }, self);
+
+            self.FullAddress = ko.computed(function() {
+                var d = self.MemberDetails();
+                if ($.isEmptyObject(d)) return "";
+                var u = !!d.Unit() ? (d.Unit() + " / ") : "";
+
+                return u + d.Number() + " " + d.Street() + " " + d.SubTown() + " " + d.State() + " " + d.Postcode();
+            }, self);
+
+            self.CalculateElectorates = function () {
+                // grab the address, geocode and calculate the electorates
+                $.post('/api/complete/geocode?address=' + encodeURIComponent(self.FullAddress()), function (geocode) {
+                    var d = self.MemberDetails();
+                    d.Latitude = geocode.Lat;
+                    d.Longitude =geocode.Lng;
+
+                    $.post('/api/complete/calculateelectorates?latitude=' + geocode.Lat + '&longitude=' + geocode.Lng, function (data) {
+                        self.MemberDetails().ElecFed(data.Fed);
+                        self.MemberDetails().ElecState(data.State);
+                        self.MemberDetails().ElecLocal(data.Local);
+                    });
+                });
+            }
+
+        };
+
+        var onlinePaymentModel, onlineMemberDetailsModel, onlineStatus, onlineSearchModel;
+        var grid, searchModel;
+
+        function onOnlineTypeChange() {
+
+            var type =  $('#OnlineApplicationType').val();
+            grid = $('#OnlineMember').data('kendoGrid');
+            grid.dataSource.filter({ field: "Type", operator: "eq", value:type });
+
+            resetOnlinePayment();
+
+            rebootMembershipType(type);
+
+        }
+
+     
+
+        function onOnlineTypeChangeNew(type) {
+
+            grid = $('#OnlineMember').data('kendoGrid');
+            grid.dataSource.filter({ field: "Type", operator: "eq", value: type });
+
+            resetOnlinePayment();
+
+            rebootMembershipType(type);
+
+        }
+
+        function resetOnlinePayment() {
+            $('.el-member-online-matches').hide();
+
+            electrac.ResetKnockoutModel(onlinePaymentModel);
+            electrac.ResetKnockoutModel(onlineMemberDetailsModel);
+
+            if ($('#OnlineApplicationType').val() == "Renewal") {
+                onlineMemberDetailsModel.NotFoundOnRoll(false);
+            }
+
+        }
+
+        function SearchModel() {
+            var self = this;
+            self.FirstName = ko.observable('').extend({ reset: true });
+            self.LastName = ko.observable('').extend({ reset: true });
+            self.MemberNumber = ko.observable('').extend({ reset: true });
+            self.Postcode = ko.observable('').extend({ reset: true });
+            self.Dob = ko.observable().extend({ reset: true });
+            self.Search = ko.observable(false).extend({ reset: true });
+
+            self.RollMatch = function() {
+                self.Search(true);
+                $('.el-member-matchresults').hide().delay(100).slideDown();
+
+                $('#MatchResult').data('kendoGrid').dataSource.read();
+                //if (detailsModel) {
+                //    electrac.ResetKnockoutModel(detailsModel);
+                //    detailsModel.NotFoundOnRoll(true);
+                //}
+
+                //if (pModel) electrac.ResetKnockoutModel(pModel);
+            }
+        }
+
+        $(function () {
+            CampaignCentralMembership.MemberModule.GridViewDetailsNotSelectRow();
+
+            onlineMemberDetailsModel = new OnlineMemberDetailsModel(paymentChoices);
+            onlinePaymentModel = new OnlinePaymentModel();
+            onlineStatus = new OnlineStatus();
+            onlineSearchModel = new SearchModel();
+            $.getJSON('/API_MEMBER/getmembertypes', function (data) {
+                ko.mapping.fromJS({ MemberTypes: data }, {}, onlineMemberDetailsModel);
+            });
+
+            $.getJSON('/API_MEMBER/getmemberbranches', function (data) {
+                ko.mapping.fromJS({ MemberBranchesFull: data }, {}, onlineMemberDetailsModel);
+            });
+
+            $.getJSON('/api/complete/GetElectoratesByType?type=Federal', function (data) {
+                ko.mapping.fromJS({ FedElectorates: data }, {}, onlineMemberDetailsModel);
+            });
+
+            $.getJSON('/api/complete/GetElectoratesByType?type=State', function (data) {
+                ko.mapping.fromJS({ StateElectorates: data }, {}, onlineMemberDetailsModel);
+            });
+
+            $.getJSON('/api/complete/GetElectoratesByType?type=Local', function (data) {
+                ko.mapping.fromJS({ LocalElectorates: data }, {}, onlineMemberDetailsModel);
+            });
+
+            $.getJSON('/API_MEMBER/GetMemberUnions', function (data) {
+                ko.mapping.fromJS({ MemberUnions: data }, {}, onlineMemberDetailsModel);
+            });
+            ko.applyBindings(onlineMemberDetailsModel, $('.el-onlinemember-details')[0]);
+            ko.applyBindings(onlineMemberDetailsModel, $('.el-member-online-notfoundonroll')[0]);
+            ko.applyBindings(onlinePaymentModel, $('.el-onlinemember-payment')[0]);
+            ko.applyBindings(onlineStatus, $('.el-online-status')[0]);
+            ko.applyBindings(onlineSearchModel, $('.el-rollmatch-binding')[0]);
+
+            //memberPaymentDetailsModel = new electrac.Member.MemberPaymentDetailsModel();
+            //ko.applyBindings(memberPaymentDetailsModel, $('.el-member-payment')[0]);
+            //BindEvents();
+            //pModel = new paymentModel();
+            //ko.cleanNode($paymentPanel);
+            //ko.applyBindings(pModel, $paymentPanel);
+
+            onOnlineTypeChange();
+        });
+
+
+
+
+    </script>
+
+
+    <script>
+
+     $(function () {
+
+        new CampaignCentralMembership.OnlineAdminNoteGridHelper($('#OnlineMember'));
+
+        vm = new CampaignCentralACT.MemberDetailsVM({
+            bootstrap: @Html.Raw(JsonConvert.SerializeObject(bootstrap)),
+         });
+
+           vm.mount(document.getElementById("@componentId"));
+
+          CampaignCentralACT.PartyOfficeAdminScreen(document.getElementById("@elId"),
+          {
+                onlineapplicationtypes: @Html.Raw(JsonConvert.SerializeObject(onlineapplicationtypes)),
+                typeChange: onOnlineTypeChangeNew
+           });
+       
+     });
+
+      function rebootMembershipType(membershipType){
+
+            if(!vm) return;
+
+            switch (membershipType) {
+                case "New":
+                    membershipType = "@MemberDetailsMode.New";
+                    break;
+                case "Renewal":
+                    membershipType = "@MemberDetailsMode.Renewal";
+                    break;
+                case "Donation":
+                    membershipType = "@MemberDetailsMode.Donation";
+                    break;
+                case "@MemberDetailsMode.CardUpdate":
+                membershipType = "@MemberDetailsMode.CardUpdate";
+                break;
+                case "@MemberDetailsMode.AddressUpdate":
+                membershipType = "@MemberDetailsMode.AddressUpdate";
+                break;
+            }
+
+            vm.options.bootstrap.Mode = membershipType;
+            vm.rebootComponent();
+
+
+        }
+
+
+    function rebootElectorId(electorId){
+
+        if(!vm) return;
+
+        vm.options.bootstrap.ElectorId = electorId;
+        vm.options.bootstrap.Source = "@MemberDetailsSource.Roll";
+        // vm.options.bootstrap.LoadListData = false;
+
+        vm.rebootComponent();
+
+        }
+
+    function rebootAsExternalSource(id){
+
+        if(!vm) return;
+
+        vm.options.bootstrap.Id = id;
+        vm.options.bootstrap.EntityId = null;
+        vm.options.bootstrap.ElectorId = null;
+
+        vm.options.bootstrap.Source = "@MemberDetailsSource.External";
+        // vm.options.bootstrap.LoadListData = false;
+
+        vm.rebootComponent();
+
+        }
+
+
+
+
+    </script>
+
+
+}

@@ -1,0 +1,51 @@
+﻿@using Electrac.Core.Model
+@using Electrac.Model.Membership
+@using System.Linq
+@model Electrac.Core.Model.Person
+@{
+    var branches = Model.Groups.OfType<MemberBranch>().AsEnumerable();
+    var units = Model.Groups.OfType<PartyUnit>().AsEnumerable();
+}
+@if (branches.Any())
+{
+    <div class="el-pane-tight">
+        @foreach (var Branch in branches)
+        {
+            <b>Member of the 
+                <a href="@Url.Action("Index", "Group", new { id = Branch.Id })" onclick="ShowPopup( @Branch.Id, 'G');  return false; ">
+                    @Branch.FullName</a>  branch
+            </b>
+            <div>
+                @foreach (var PositionHeld in Branch.Positions.Where(p => p.EntityID == Model.EntityID).Select(p => p.Name))
+                {
+                    <div>
+                        @PositionHeld
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (units.Any())
+{
+    <div class="el-pane-tight">
+        @foreach (var u in units)
+        {
+            <b>
+                Member of the
+                <a href="@Url.Action("Index", "Group", new { id = u.Id })" onclick="ShowPopup( @u.Id, 'G');  return false; ">
+                    @u.Name
+                </a> committee
+            </b>
+            <div>
+                @foreach (var PositionHeld in u.Positions.Where(p => p.EntityID == Model.EntityID).Select(p => p.Name))
+                {
+                    <div>
+                        @PositionHeld
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}

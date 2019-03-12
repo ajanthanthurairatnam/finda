@@ -1,0 +1,118 @@
+﻿@model Electrac.Plugin.MembershipCore.Models.MemberBranchMinutesViewModel
+@using Electrac.Plugin.MembershipCore.App_Code
+@{ 
+    ViewBag.Title = "Meeting Admin";
+    ViewBag.UseBootstrap = true;
+    var ns = Electrac.Plugin.MembershipCore.MembershipAssetProvider.ScriptNamespace;
+}
+<div class="container">
+    <div class="ra-first-section well">
+        <div class="form-horizontal">
+            @Form.KendoDateItem("Date", "Date")
+            @Form.KendoComboBoxItem("Branch", "Branches", "BranchID", "Select member branch...")
+        </div>
+    </div>
+    <div class="ra-section well clearfix el-hidden" data-bind="visible: Visible">
+        <div class="form-horizontal">
+            <div class="ra-well-title">File upload</div>
+            @*@Form.Item("Motion", "Motion")*@
+            @*<div class="form-group">
+                    <label class="control-label col-sm-3">File Upload</label>
+                    <div class="col-sm-7 col-md-6">
+                        <form method="POST" data-bind="kendoUpload: { async: { saveUrl: '/member/branchminutes_filesave', removeUrl: '/member/branchminutes_fileremove', autoUpload: false }, upload: onMinuteFileUpload }">
+                            <div>
+                                <input name="files[]" type="file"/>
+                            </div>
+                        </form>
+                    </div>
+                </div> *@
+            @(Model.MinutesUploader(Html, Url))
+        </div>
+    </div>
+
+
+
+
+    <div class="ra-section well clearfix el-hidden" data-bind="visible: MembersGridVisible">
+        <h3>Members Attendance</h3>
+        <br />
+        <div class="k-header">Use ctrl+ for multiple selection </div>
+        <br />
+        <div id="allMembersGrid" data-bind="kendoGrid: { data: Members, columns: [{ field: 'Name' }, { field: 'MemberNumber', title: 'Member Number', width: '100px' }, { field: 'Address' }, { field: 'Postcode', width: '75px' }, { command: { text: 'View Details', click: viewDetails, title: '' } }], toolbar: kendo.template($('#memberAttendance').html()), selectable: 'multiple', sortable: true, scrollable: true, filterable: true }"></div>
+    </div>
+
+    @Html.Hidden("BranchID", Model.BranchID)
+</div>
+
+<script type="text/x-kendo-template" id="newMemberAcceptance">
+    <div data-bind="hidden: Visible" class="alert alert-info">
+        <strong>You must specify a date in order to approve members</strong>
+    </div>
+    <div data-bind="visible: Visible">
+        <button class="k-button el-member-minutesapproveall">Approve All</button>
+        <button class="k-button el-member-minutesapproveselected">Approve Selected</button>
+    </div>
+</script>
+
+<script type="text/x-kendo-template" id="memberAttendance">
+    <div data-bind="hidden: Visible" class="alert alert-info">
+        <strong>You must specify a date in order to mark attendance</strong>
+    </div>
+    <div data-bind="visible: Visible">
+        <button class="k-button el-member-minutesattendall">Mark All</button>
+        <button class="k-button el-member-minutesattendselected">Mark Selected</button>
+    </div>
+</script>
+
+@section Scripts
+{
+    <script type="text/javascript">
+        var vm;
+        @* NOTE: This was in Electrac.Common from reference branch. We could move it there 
+            if we've determined that there will be multiple usages of this
+        *@
+        function viewDetails(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            var dataItem = this.dataItem($(e.target).parents('tr').eq(0));
+            var id = dataItem.ElectorID ? dataItem.ElectorID : dataItem.EntityID;
+            ShowElectorPopup(id, dataItem.ElectorID ? 'elector' : 'm');
+        }
+
+        function onMinuteFileUpload(e) {
+            vm.setMinuteFileUploadData(e);
+        }
+
+        $(function() {
+            vm = new @(ns).BranchMinutesViewModel({
+                targets: {
+                    newMembersGrid: $("#newMembersGrid"),
+                    allMembersGrid: $("#allMembersGrid")
+                },
+                services: {
+                    getMembersByBranchUrl: "@Model.GetMembersByBranchUrl(Url)",
+                    getMemberBranchesUrl: "@Model.GetMemberBranchesUrl(Url)",
+                    approveAllUrl: "@Model.ApproveAllUrl(Url)",
+                    approveSelectedUrl: "@Model.ApproveSelectedUrl(Url)",
+                    attendAllUrl: "@Model.AttendAllUrl(Url)",
+                    attendSelectedUrl: "@Model.AttendSelectedUrl(Url)"
+                }
+            });
+            vm.init();
+            $('.el-hidden').removeClass('el-hidden');
+            $("body").on("click", ".el-member-minutesapproveall", function(e) {
+                vm.handleApproveAll();
+            }).on("click", ".el-member-minutesapproveselected", function(e) {
+                vm.handleApproveSelected();
+            }).on("click", ".el-member-minutesattendall", function (e) {
+                vm.handleAttendAll();
+            }).on("click", ".el-member-minutesattendselected", function (e) {
+                vm.handleAttendSelected();
+            });
+        });
+
+        @*
+        NOTE: There was SignalR code from the reference branch that is not ported across
+        *@
+    </script>
+}

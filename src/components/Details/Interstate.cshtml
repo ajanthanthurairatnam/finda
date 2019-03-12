@@ -1,0 +1,34 @@
+﻿@using Electrac.Plugin.MembershipCore.App_Code
+@model Electrac.Plugin.MembershipCore.Models.MemberRollMatchViewModel
+<div class="el-hidden" data-bind="visible: Visible">
+    <label><input type="checkbox" data-bind="checked: Interstate" /> Interstate Transfer</label>
+</div>
+<div class="ra-section clearfix well el-hidden" data-bind="visible: Interstate">
+    <div class="form-horizontal form-widgets">
+        <div class="form-group">
+            <div class="control-label col-sm-6"><label>Note: No payment required for this membership year.</label></div>
+            <div class="col-sm-6 col-md-6">
+            </div>
+        </div>
+        @Form.KendoDateItem("Joined Date", "JoinedOn")
+        @Form.KendoDateItem("Continuity Date", "ContinuityDate")
+        @Form.KendoDateItem("Paid To Date", "PaidTo")
+        @Form.Item("Previous Branch", "PreviousBranch")
+        @Form.Item("Previous Member Number", "PreviousMemberNumber")
+        <div class="form-group" data-bind="visible: SaveInterstateSuccess">
+            <div class="control-label col-sm-3">@Form.IconTick()</div>
+            <div class="col-sm-7 col-md-6 big-line">
+                <div class="fontDarkblue">
+                    The information have been saved successfully. <br />
+                    Use the payment paneal below to register payment details or make donations.
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="control-label col-sm-3"></div>
+            <div class="col-sm-7 col-md-6">
+                <button class="k-button" data-bind="enable: !SaveInterstateSuccess(), click: SaveInterstate">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
